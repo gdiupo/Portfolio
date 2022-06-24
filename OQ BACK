@@ -1,0 +1,731 @@
+<?php
+
+namespace App\Http\Controllers\Api;
+
+use App\Attachment;
+use App\Booking;
+use App\Booking_absent;
+use App\Booking_amendment;
+use App\Booking_bed;
+use App\BookingPayment;
+use App\Building;
+use App\Employer;
+use App\Http\Controllers\Controller;
+use App\Person;
+use DB;
+use Google2FA;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Http\Request;
+use JWTAuth;
+use Schema;
+use Validator;
+
+class DatabaseBookingUserController extends Controller
+{
+//    public function getUploadPath()
+//    {
+//        return env("DC_UPLOAD_PATH");
+//    }
+
+    private function strToDbDate($date)
+    {  //แปลง วันที่ string to date (15/04/2020 => 2020-15-04)
+        if ($date == "" || $date == "null") {
+            return NULL;
+        }
+        $news_date = $date;
+        $pos = strrpos($news_date, "-");
+        if ($pos === false) {
+            $startDateArr = explode("/", $news_date); //  15/04/2020
+//            Log::debug('"debug:.'. var_export($startDateArr, true) );
+
+            if ($startDateArr[2] > 2400) {  // 2563 => 2020
+                $startDateArr[2]  = $startDateArr[2] - 543;
+            }
+            $startDateArr[2] = str_pad($startDateArr[2], 4, "0", STR_PAD_LEFT);
+            $startDateArr[1] = str_pad($startDateArr[1], 2, "0", STR_PAD_LEFT);
+            $startDateArr[0] = str_pad($startDateArr[0], 2, "0", STR_PAD_LEFT);
+
+            $news_date = $startDateArr[2] . "-" . $startDateArr[1] . "-" . $startDateArr[0];
+        } else {
+            $news_date = substr($news_date, 0, 10);//YYYY-MM-DD
+        }
+        return $news_date;
+    }
+
+    private function strToDbTime($time)
+    {  //แปลง เวลา string to time (09.15 => 09:15:00)
+        $news_time = str_replace(".", ":", $time);
+        $pos = strrpos($news_time, ":");
+        if ($pos === false) {
+            $news_time = "00:00:00";
+        } else {
+            if (strlen($news_time) == 5) {
+                $news_time = $news_time . ":00";
+            }
+        }
+        if (strlen($news_time) != 8) {
+            $news_time = "00:00:00";
+        }
+        return $news_time;
+    }
+
+    public function index(Request $request)
+    {
+        $p1 = $request->get("param1", null); //booking_code
+        $p2 = $request->get("param2", null);//created_date
+        $p3 = $request->get("param3", null);//employer_name
+        $p4 = $request->get("param4", null);//booking_status_id
+        $p5 = $request->get("param5", null);//created_at_from
+        $p6 = $request->get("param6", null);//created_at_to
+        $p7 = $request->get("param7", '1');//booking_type_id
+
+
+        if ($p5) {
+            $p5 = $this->strToDbDate($p5) . ' 00:00:00';
+        }
+        if ($p6) {
+            $p6 = $this->strToDbDate($p6) . ' 23:59:59';
+        }
+
+        $params = [
+            "p1" => $p1,
+            "p2" => $p2,
+            "p3" => $p3,
+            "p4" => $p4,
+            "p5" => $p5,
+            "p6" => $p6
+        ];
+
+
+        $ds = Booking::select('bookings.id as id'
+            , 'bookings.booking_code as booking_code'
+            , 'bookings.employer_id as employer_id'
+            , DB::raw('oq_tak.get_employer_name(bookings.employer_id) as employer_name')
+            , 'bookings.booking_status_id as booking_status_id'
+            , DB::raw('oq_tak.get_booking_statuses_name_a(bookings.booking_status_id) as booking_status_name')
+            , DB::raw("concat(ifnull(oq_tak.get_booking_statuses_name_a(bookings.booking_status_id),''),'',ifnull(concat('/',oq_tak.get_payment_status_bid(bookings.id)),'')) as booking_status_name")
+            , DB::raw('oq_tak.get_package_name(bookings.package_id) as package_name')
+            , DB::raw('oq_tak.get_payment_status_bid(bookings.id) as payment_status')
+            , DB::raw('oq_tak.JETOT(bookings.check_in_date) as check_in_date')
+            , DB::raw('oq_tak.JETOT(bookings.check_out_date) as check_out_date')
+            , DB::raw('oq_tak.get_user_type(bookings.created_id) as user_type')
+            , DB::raw('oq_tak.JETOT(bookings.created_at) as created_date')
+            , DB::raw('oq_tak.get_rest_status_name(bookings.rest_status_id) as beds_status')
+
+        )->where([
+            ['bookings.is_active', '1'],
+            ['bookings.booking_type_id', $p7],
+            ['bookings.booking_status_id', '4'],
+
+        ])
+            ->whereIn('bp.payment_status_id',[4,5])
+            ->join('oq_tak.employers as e', 'bookings.employer_id', '=', 'e.id')
+            ->join('oq_tak.booking_payments as bp','bookings.id','=','bp.booking_id')
+            ->when($params, function ($query, $params) {
+                if ($params["p1"] != null) {
+                    $query->where('bookings.booking_code', 'like', '%'.$params["p1"] . '%');
+                }
+//                if ($params["p2"]!=null){
+//                    $query->where(DB::raw('oq_tak.JETOT(bookings.created_at) as created_date'), 'like', $params["p2"].'%');
+//                }
+                if ($params["p3"] != null) {
+                    $query->where('e.employer_name', 'like', '%' . $params["p3"] . '%');
+                }
+                if ($params["p4"] != null) {
+                    $query->where('bookings.booking_status_id', '=', $params["p4"]);
+                }
+                if ($params["p5"] != null) {
+                    $query->whereRaw('bookings.created_at  >= ? ', [$params["p5"]]);
+                }
+                if ($params["p6"] != null) {
+                    $query->whereRaw('bookings.created_at  <= ? ', [$params["p6"]]);
+                }
+
+                return $query;
+            })
+            ->orderBy('bookings.id', 'desc')
+            ->get();
+
+        return response()->json($ds);
+    }
+
+
+    public function checkdb(Request $request)
+    {
+        $p1 = $request->get("param1", null); //booking_code
+        $p2 = $request->get("param2", null);//created_date
+        $p3 = $request->get("param3", null);//employer_name
+        $p4 = $request->get("param4", null);//booking_status_id
+        $p5 = $request->get("param5", null);//created_at_from
+        $p6 = $request->get("param6", null);//created_at_to
+        $p7 = $request->get("param7", '1');//booking_type_id
+
+
+        if ($p5) {
+            $p5 = $this->strToDbDate($p5) . ' 00:00:00';
+        }
+        if ($p6) {
+            $p6 = $this->strToDbDate($p6) . ' 23:59:59';
+        }
+
+        $params = [
+            "p1" => $p1,
+            "p2" => $p2,
+            "p3" => $p3,
+            "p4" => $p4,
+            "p5" => $p5,
+            "p6" => $p6
+        ];
+
+
+        $ds = Booking::select('bookings.id as id'
+            , 'bookings.booking_code as booking_code'
+            , 'bookings.employer_id as employer_id'
+            , DB::raw('oq_tak.get_employer_name(bookings.employer_id) as employer_name')
+            , 'bookings.booking_status_id as booking_status_id'
+            , DB::raw('oq_tak.get_booking_statuses_name_a(bookings.booking_status_id) as booking_status_name')
+            , DB::raw("concat(ifnull(oq_tak.get_booking_statuses_name_a(bookings.booking_status_id),''),'',ifnull(concat('/',oq_tak.get_payment_status_bid(bookings.id)),'')) as booking_status_name")
+            , DB::raw('oq_tak.get_package_name(bookings.package_id) as package_name')
+            , DB::raw('oq_tak.get_payment_status_bid(bookings.id) as payment_status')
+            , DB::raw('oq_tak.JETOT(bookings.check_in_date) as check_in_date')
+            , DB::raw('oq_tak.JETOT(bookings.check_out_date) as check_out_date')
+            , DB::raw('oq_tak.get_user_type(bookings.created_id) as user_type')
+            , DB::raw('oq_tak.JETOT(bookings.created_at) as created_date')
+            , DB::raw('oq_tak.get_rest_status_name(bookings.rest_status_id) as beds_status')
+
+        )->where([
+            ['bookings.is_active', '1'],
+            ['bookings.booking_type_id', $p7],
+            ['bookings.booking_status_id', '4'],
+            ['bookings.rest_status_id','!=',null],
+
+        ])
+            ->whereIn('bp.payment_status_id',[4,5])
+            ->join('oq_tak.employers as e', 'bookings.employer_id', '=', 'e.id')
+            ->join('oq_tak.booking_payments as bp','bookings.id','=','bp.booking_id')
+            ->when($params, function ($query, $params) {
+                if ($params["p1"] != null) {
+                    $query->where('bookings.booking_code', 'like', '%'.$params["p1"] . '%');
+                }
+//                if ($params["p2"]!=null){
+//                    $query->where(DB::raw('oq_tak.JETOT(bookings.created_at) as created_date'), 'like', $params["p2"].'%');
+//                }
+                if ($params["p3"] != null) {
+                    $query->where('e.employer_name', 'like', '%' . $params["p3"] . '%');
+                }
+                if ($params["p4"] != null) {
+                    $query->where('bookings.booking_status_id', '=', $params["p4"]);
+                }
+                if ($params["p5"] != null) {
+                    $query->whereRaw('bookings.created_at  >= ? ', [$params["p5"]]);
+                }
+                if ($params["p6"] != null) {
+                    $query->whereRaw('bookings.created_at  <= ? ', [$params["p6"]]);
+                }
+
+                return $query;
+            })
+            ->orderBy('bookings.id', 'desc')
+            ->get();
+
+        return response()->json($ds);
+    }
+
+    public function store(Request $request)
+    {
+    }
+
+    public function registerAddUserAttach(Request $request, $ds_id, $p_ref_file, $my_file, $attach_type)
+    {
+        $ref_file = $p_ref_file;
+        //$my_file = 'file_cardid';
+        if ($request->hasfile($my_file) && $request->file($my_file)->isValid()) {
+
+            $ref_file = $p_ref_file;
+            $uuid = uniqid();
+            if ($ref_file == "") {
+                $ref_file = $uuid;
+            }
+
+            $path = 'data' . '/'. $attach_type.'/' . date('Y/m/d');
+            $dst_path = $this->getUploadPath() . $path;
+
+
+            if (!file_exists($dst_path)) {
+                $old_umask = umask(0);
+                mkdir($dst_path, 0775, true);
+                umask($old_umask);
+            }
+            $ext = strtolower($request->file($my_file)->extension());
+            $filename = $ds_id . '_' . $my_file . '.' . $ext;
+            $file_size = $request->file($my_file)->getSize();
+            $original = $request->file($my_file)->getClientOriginalName();
+            $request->file($my_file)->move($dst_path, $filename);
+            $dst = $dst_path . '/' . $filename;
+            $finfo = new \finfo(FILEINFO_MIME_TYPE);
+
+            $dsa = Attachment::where([
+                ['ref_id', $ds_id],
+                ['ref_group', $p_ref_file],
+                ['attach_type', $attach_type],
+                ['is_active', '1'],
+            ])->first();
+            if (!$dsa) {
+                //insert
+                $dsa = new Attachment();
+            }
+            $dsa->attach_type = $attach_type;
+            $dsa->file_name = $filename;
+            $dsa->file_path = $path;
+            $dsa->file_type = $finfo->file($dst);
+            $dsa->file_name_original = $original;
+            $dsa->ref_id = $ds_id;
+            $dsa->public_key = md5($filename);
+            $dsa->file_size = $file_size;
+            $dsa->is_active = 1;
+            $dsa->created_id = 0;
+            $dsa->updated_id = 0;
+            $dsa->ref_group = $ref_file;
+            //$dsa->save();
+            if ($dsa->save()) {
+                return $ref_file;
+            }
+        }
+        return $ref_file;
+    }
+
+
+    public function show(Request $request, $id)
+    {
+        $ds = Booking::join('employers as em', 'bookings.employer_id', '=', 'em.id')
+            ->where([
+                ['bookings.id', '=', $id]
+            ])
+            ->select('bookings.id as id'
+                , 'bookings.booking_code as booking_code'
+                , 'bookings.total_person as total_person'
+                , 'bookings.total_male as total_male'
+                , 'bookings.total_female as total_female'
+                , 'bookings.rest_status_id as rest_status_id'
+                , 'bookings.approve_reason as approve_reason'
+
+                , 'bookings.package_id as package_id'
+                , DB::raw('oq_tak.get_package_name(bookings.package_id) as package_name')
+                , DB::raw('oq_tak.get_package_day(bookings.package_id) as package_day')
+                , 'bookings.booking_status_id as booking_status_id'
+                , DB::raw('oq_tak.get_booking_statuses_name(bookings.booking_status_id) as booking_status_name')
+                , DB::raw('oq_tak.JETOT(bookings.check_in_date) as check_in_date')
+                , DB::raw('oq_tak.JETOT(bookings.check_out_date) as check_out_date')
+                , 'bookings.deposit_amount1 as deposit_amount1'
+
+                , DB::raw('oq_tak.get_attachments_id(bookings.file_list) as attach_id_list')
+                , DB::raw('oq_tak.get_attachments_name(bookings.file_list) as filename_list')
+
+                , 'bookings.file_list as file_list'
+                , DB::raw('oq_tak.get_attachments_id(bookings.file_covid) as attach_id_covid')
+                , DB::raw('oq_tak.get_attachments_name(bookings.file_covid) as filename_covid')
+                , 'bookings.file_covid as file_covid'
+
+                , DB::raw('oq_tak.get_attachments_id(bookings.file_vaccine) as attach_id_vaccine')
+                , DB::raw('oq_tak.get_attachments_name(bookings.file_vaccine) as filename_vaccine')
+                , 'bookings.file_vaccine as file_vaccine'
+
+                , 'em.id as id'
+                , 'em.employer_code as employer_code'
+                , 'em.employer_name as employer_name'
+                , 'em.contact_number as contact_number'
+                , 'em.address as address'
+                , 'em.moo as moo'
+                , 'em.soi as soi'
+                , 'em.street as street'
+                , 'em.subdistrict as subdistrict'
+                , 'em.district as district'
+                , 'em.province as province'
+                , 'em.zip_code as zip_code'
+                // , DB::raw('get_m_business_type_name(em.business_type) as business_type_name')
+                , 'em.business_type as business_type'
+                , DB::raw('oq_tak.get_tumbon_name(em.province,em.district,em.subdistrict) as subdistrict_name')
+                , DB::raw('oq_tak.JDTOTT(bookings.created_at) as created_date')
+                , 'bookings.zone_id as zone_id'
+                , 'bookings.created_id as created_id'
+                //, DB::raw('oq_tak.get_m_business_type_name(em.business_type) as business_type_name')
+                , DB::raw('oq_tak.get_rest_status_name(bookings.rest_status_id) as beds_status')
+            )->first();
+        if (!$ds) {
+            return response()->json([
+                'status' => 'Error',
+                'message' => 'ไม่พบข้อมูล',
+            ], 422);
+        }
+        $ds2 = Booking_absent::join('persons as p', 'booking_absents.person_id', '=', 'p.id')
+            ->where([
+                ['booking_absents.booking_id', $id],
+            ])->select(
+                'p.passport as passport',
+                'p.first_name as first_name',
+                'p.last_name as last_name',
+                DB::raw('oq_tak.JDTOE(p.birth_date) as birth_date')
+            )->get();
+        $ds3 = BookingPayment::where([
+            ['booking_payments.booking_id', $id],
+        ])->select('booking_payments.id as booking_payments_id'
+            ,'booking_payments.booking_id as booking_id'
+            , DB::raw('oq_tak.get_attachments_id(booking_payments.user_attachment) as attach_id_attachment')
+            , 'booking_payments.user_attachment as user_attachment'
+            ,'booking_payments.user_transaction_code as user_transaction_code'
+            , DB::raw('oq_tak.JETOT(booking_payments.user_payment_datetime) as user_payment_date')
+            , DB::raw('time(booking_payments.user_payment_datetime) as user_payment_time')
+            , 'booking_payments.user_payment_amount as user_payment_amount'
+        )->first();
+        $ds4 = Booking_bed::join('persons as p', 'booking_beds.person_id', '=', 'p.id')
+            ->where([
+                ['booking_beds.booking_id', $id],
+                ['p.sex', '1'],
+                ['p.is_active', '1'],
+            ])->select(
+                'p.passport as passport',
+                'p.first_name as first_name',
+                'p.last_name as last_name',
+                'p.birth_location as birth_location',
+                DB::raw('oq_tak.JDTOE(p.birth_date) as birth_date')
+                , DB::raw('oq_tak.get_gender(p.sex) as gender')
+                ,'p.sex as sex'
+                ,'booking_beds.bed_code as bed_code'
+            )->get();
+        $ds5 = Booking_bed::join('persons as p', 'booking_beds.person_id', '=', 'p.id')
+            ->where([
+                ['booking_beds.booking_id', $id],
+                ['p.sex', '2'],
+                ['p.is_active', '1'],
+            ])->select(
+                'p.passport as passport',
+                'p.first_name as first_name',
+                'p.last_name as last_name',
+                'p.birth_location as birth_location',
+                DB::raw('oq_tak.JDTOE(p.birth_date) as birth_date')
+                , DB::raw('oq_tak.get_gender(p.sex) as gender')
+                , 'p.sex as sex'
+                ,'booking_beds.bed_code as bed_code'
+            )->get();
+        return response()->json([
+            'status' => 'OK',
+            'message' => 'ดึงข้อมูลสำเร็จ',
+            'data' => $ds,
+            'subdata' => $ds2,
+            'paydata' => $ds3,
+            'bedmaldata' => $ds4,
+            'bedfemaldata' => $ds5
+        ], 200);
+        return response()->json($ds);
+    }
+
+    public function update(Request $request, $id)
+    {
+        $current_user_id = $request->p_current_user->id;
+        DB::beginTransaction();
+        try {
+            //delete booking_bed_reserve by booking_id
+            DB::statement('CALL delBedReserve(?)',[$id]);
+//            $data_test = DB::select('select * from booking_bed_reserves where booking_id = :book_id',['book_id'=>$id]);
+//            DB::rollBack();
+//            return response()->json([
+//                'status' => 'Error',
+//                'message' => 'ทดสอบๆๆๆ',
+//                'bed_free'=>$data_test,
+//            ], 425);
+
+
+            $rest_status_id = $request->get('rest_status_id');
+            $approve_reason = $request->get('approve_reason');
+            $malperson = $request->get('mal_Booking_bed');
+            $femalperson = $request->get('femal_Booking_bed');
+            $booking_in = $this->strToDbDate($request->get('booking_in_date'));
+            $booking_out =  $this->strToDbDate($request->get('booking_out_date'));
+
+            $malperson = json_decode($malperson, true);
+            $femalperson = json_decode($femalperson, true);
+            $person = array_merge($malperson, $femalperson);
+
+            if ($person) {
+                //check beds is free ?
+                Schema::create('tbl_temp', function (Blueprint $table) {
+                    $table->increments('id');
+                    $table->string('passport');
+                    $table->string('first_name');
+                    $table->string('last_name');
+                    $table->string('bed_code');
+                    $table->string('birth_date');
+                    $table->string('birth_location');
+                    $table->string('gender')->default('ชาย');
+                    $table->string('sex');
+//                    $table->string('is_free');
+                    $table->timestamps();
+                    $table->temporary();
+                });
+
+                DB::table('tbl_temp')->insert($person);
+
+                $data = DB::table('tbl_temp')->get();
+//                $bed_free=[];
+                $bed_free =DB::select('
+                select bed_code
+                from tbl_temp
+                where oq_tak.is_bed_free(bed_code,:booking_in,:booking_out) <> 0             
+                
+                ' ,['booking_in'=>$booking_in,'booking_out'=>$booking_out]        );
+//                if($data){
+//                    for ($i = 0; $i < count($data); $i++){
+//
+//
+//                        $bed_free=DB::raw('oq_tak.is_bed_free( :param1,:param2,:param3) as bed_fre',[
+//                            ':param1'=>$data[$i]->bed_code,
+//                            ':param2'=>$this->strToDbDate($request->get('booking_in_date')),
+//                            ':param3'=>$this->strToDbDate($request->get('booking_out_date'))
+//                        ] )
+//                       ->get();
+//
+//
+//                    }
+//
+//                }
+
+
+                Schema::drop('tbl_temp');
+                if($bed_free){
+                    DB::rollBack();
+                    return response()->json([
+                        'status' => 'Error',
+                        'message' => 'เตียงต่อไปนี้ไม่ว่าง',
+                        'bed_free'=>$bed_free,
+                    ], 425);
+                }
+
+
+
+
+            }
+            if ($person) {
+                /* for Update */
+                $drop = Booking_bed::where('booking_id' , $id);
+                $drop->delete();
+
+                for ($i = 0; $i < count($person); $i++) {
+                    $new_birth_date =$person[$i]['birth_date'];
+                    $p = Person::updateOrCreate([
+                        'passport' => $person[$i]['passport']
+                    ], [
+                        'passport' => $person[$i]['passport'],
+                        'first_name' => $person[$i]['first_name'],
+                        'last_name' => $person[$i]['last_name'],
+                        'birth_location' => $person[$i]['birth_location'],
+                        'birth_date' =>$this->strToDbDate($new_birth_date),
+                        'sex' => $person[$i]['sex'],
+                        'is_active' => '1',
+                        'created_id' => $current_user_id,
+                        'updated_id' => $current_user_id
+                    ]);
+
+                    $ds = Booking_bed::updateOrCreate([
+                        'booking_id' => $id,
+                        'person_id' => $p->id
+                    ], [
+                        'booking_in_date' => $this->strToDbDate($request->get('booking_in_date')),
+                        'booking_out_date' => $this->strToDbDate($request->get('booking_out_date')),
+                        'bed_code' => $person[$i]['bed_code'],
+                        'check_out_reason_id' => '1',
+                        'absent_type' => '1',
+                        'is_active' => '1',
+                        'created_id' => $current_user_id,
+                        'updated_id' => $current_user_id
+                    ]);
+                }
+                //insert booking_bed_reserve
+                DB::statement('CALL addBedReserve(?)',[$id]);
+
+                Booking::updateOrCreate([
+                    'id' => $id,
+                ], [
+                    'rest_status_id'=>$rest_status_id,
+                    'updated_id'=> $current_user_id,
+                    'approve_reason'=>$approve_reason,
+                    ]);
+            }
+            DB::commit();
+            return response()->json([
+                'status' => 'OK',
+                'message' => 'บันทึกข้อมูลสำเร็จ',
+                'data' => $ds
+            ], 200);
+        } catch (Exception $e) {
+            DB::rollBack();
+            return response()->json([
+                'status' => 'Error',
+                'message' => 'ไม่สามารถบันทึกข้อมูลได้ เนื่องจากมีข้อมูลนี้อยู่แล้ว',
+            ], 422);
+        }
+    }
+
+    public function listBedFree($p_booking_id,$p_zone_id,$p_building_code=null)
+    {
+
+        //find building if $p_building_code==null
+        if ($p_building_code==null){
+
+
+            $ds_building=Building::select('building_code')
+                ->where([ ['zone_id',$p_zone_id] ,
+                          ['is_active',1],
+                          ['status_id',1],
+                ])
+                ->first();
+            if ($ds_building){
+                $p_building_code=$ds_building->building_code;
+            }
+        }
+        //find date_start , and date_end
+        $p_date_start=null;
+        $p_date_end=null;
+        $ds_booking=Booking::select('check_in_date','check_out_date')
+            ->where([ ['id',$p_booking_id] ,
+                ['is_active',1],
+                ['booking_status_id',4],
+            ])
+            ->first();
+        if ($ds_booking){
+            $p_date_start=$ds_booking->check_in_date;
+            $p_date_end=$ds_booking->check_out_date;
+        }
+        //find bed free for building
+        $ds=DB::select('
+        select mu.building_code,substring(mb.room_code,2,1) as floor,  
+        substring(mb.room_code,3,2)-0 as room_no,
+        mb.room_code,   mb.bed_code 
+        from buildings mu
+        inner join rooms mr on mu.building_code=mr.building_code and mr.is_active=1 and  mr.status_id=1
+        inner join beds mb on  mr.room_code=mb.room_code and mb.is_active=1 and  mb.status_id=1      
+        where mu.is_active=1 and  mu.status_id=1 
+        and mu.zone_id=:zone_id
+        and mu.building_code=:building_code
+        and is_bed_free_booking(0, mb.bed_code,:date_start, :date_end ) = 0  
+        order by mb.id 
+        ',  [   "zone_id"=>$p_zone_id,
+                "building_code"=>$p_building_code,
+                "date_start"=>$p_date_start,
+                "date_end"=>$p_date_end
+            ]) ;
+
+        return response()->json([
+            'status' => 'OK',
+            'message' => 'Getdata',
+            'data' => $ds
+        ], 200);
+
+    }
+    public function showBedFree(Request $request, $p_booking_id)
+    {
+        $validator = Validator::make($request->all(), [
+            'booking_in_date' => 'required',
+            'booking_out_date' => 'required',
+            'zone_id' => 'required',
+            'building_code' => 'required',
+            'floor' => 'required',
+            'room' => 'required',
+            'count' => 'required'
+        ]);
+        if ($validator->fails()) {
+            return response()->json(['status'=>false,'message' => 'Parameters Required'], 401);
+        }
+        /*
+        p_booking_id 10 , 13
+        p_date_start = '2022-02-05'     *from booking_in_date
+        p_date_end = '2022-02-11'       *from booking_out_date
+
+        p_zone_id = 1                   *require*
+        p_building_code = 'A'           *require*
+        p_floor = 1                     *require*
+        p_room = 01                     *require*
+        p_count = 1                     *require*
+
+        mal_Booking_bed                 *require array*
+        femal_Booking_bed               *require array*
+        *clear ิ bed  ใน mal_Booking_bed or femal_Booking_bed ให้เป็นว่างตามจำนวนที่ต้องการ *
+        */
+        $p_date_start = $this->strToDbDate($request->get('booking_in_date'));
+        $p_date_end =  $this->strToDbDate($request->get('booking_out_date'));
+
+        $p_zone_id = $request->get('zone_id','1');
+        $p_building_code = $request->get('building_code','A');
+        $p_floor = $request->get('floor','1');
+        $p_room = $request->get('room','01');
+        if (strlen($p_room)<2){
+            $p_room="0".$p_room;
+        }
+        $p_count = $request->get('count','1');
+        $p_room_code_where = $p_building_code .$p_floor . $p_room . '1';
+
+        $malperson = $request->get('mal_Booking_bed');
+        $femalperson = $request->get('femal_Booking_bed');
+//        $malperson = json_decode($malperson, true);
+//        $femalperson = json_decode($femalperson, true);
+        $persons = array_merge($malperson, $femalperson);
+        DB::beginTransaction();
+        try {
+            //bed_code in persons must not free
+            $bed_code_not_frees=[];
+            $idx=0;
+            if ($persons) {
+                for ($i = 0; $i < count($persons); $i++) {
+                  $bed_code= trim($persons[$i]['bed_code']);
+                  if ($bed_code=="") continue;
+                  $bed_code_not_free=["booking_id"=>$p_booking_id,"bed_code"=>$bed_code];
+                  $bed_code_not_frees[$idx]=$bed_code_not_free;
+                    $idx++;
+                }
+            }
+            //bulk insert to tmp_booking_beds
+            DB::table('tmp_booking_beds')->where('booking_id', '=', $p_booking_id)->delete();
+            if (count($bed_code_not_frees)>0){
+                DB::table('tmp_booking_beds')->insert($bed_code_not_frees);
+            }
+            $ds=DB::select('
+        select mu.building_code,substring(mb.room_code,2,1) as floor,  
+        substring(mb.room_code,3,2)-0 as room_no,
+        mb.room_code,   
+        mb.bed_code 
+        from buildings mu
+        inner join rooms mr on mu.building_code=mr.building_code and mr.is_active=1 and  mr.status_id=1
+        inner join beds mb on  mr.room_code=mb.room_code and mb.is_active=1 and  mb.status_id=1      
+        where mu.is_active=1 and  mu.status_id=1 
+        and mu.zone_id=:zone_id      
+        and mb.bed_code >= :bed_code
+        and is_bed_free_booking(:booking_id, mb.bed_code,:date_start, :date_end ) = 0          
+        order by mb.id 
+        limit 0,:limit_count
+        ',  [
+                "zone_id"=>$p_zone_id,
+                "bed_code"=>$p_room_code_where,
+                "date_start"=>$p_date_start,
+                "date_end"=>$p_date_end ,
+                "booking_id"=>$p_booking_id,
+                "limit_count"=>$p_count
+            ]) ;
+            DB::commit();
+
+            return response()->json([
+                'status' => 'OK',
+                'message' => 'Getdata showBedFree',
+                'data' => $ds
+            ], 200);
+
+        } catch (Exception $e) {
+            DB::rollBack();
+            return response()->json([
+                'status' => 'Error',
+                'message' => 'Exception ',
+            ], 422);
+        }
+    }
+}
+
+
