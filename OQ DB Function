@@ -1,0 +1,50 @@
+DELIMITER $$
+CREATE DEFINER=`bnladmin`@`localhost` FUNCTION `is_bed_free`( p_bed_code VARCHAR(10),p_date_start date,p_date_end date) RETURNS int(11)
+    NO SQL
+begin
+	/* 0=free >0 not free */
+    /* 99=bed_code invalid */ 
+    
+	declare v_bed_count int;
+    declare v_room_code varchar(4);
+    declare v_bed_exist int;
+    
+	set v_bed_count:=0;
+    set v_room_code:=substring(p_bed_code,1,4);
+    set v_bed_exist:=0;
+	begin
+		select count(*) as total
+        into v_bed_exist
+        from buildings mu
+        inner join rooms mr on mu.building_code=mr.building_code and mr.is_active=1 and  mr.status_id=1
+        inner join beds mb on  mr.room_code=mb.room_code and mb.is_active=1 and  mb.status_id=1      
+        where mu.is_active=1 and  mu.status_id=1
+        and mb.bed_code=p_bed_code;
+    end;
+    if v_bed_exist=0 then
+		set v_bed_count:=99;
+    end if;
+    IF v_bed_count=0 THEN
+		begin
+			select count(*) as total
+			into v_bed_count
+			FROM booking_bed_reserves
+			where bed_code=p_bed_code
+			and rest_date between p_date_start and p_date_end ;
+		end;
+    end if;
+	IF v_bed_count=0 THEN
+       /*check room*/
+       set v_bed_count:=1;
+       select count(*)
+       into v_bed_count
+       FROM booking_bed_reserves
+		where  room_code= v_room_code
+		AND date_start  <>  p_date_start
+		AND date_end  BETWEEN p_date_start AND p_date_end    
+		AND date_start BETWEEN p_date_start AND p_date_end   ;
+    END IF;
+
+	return v_bed_count;
+end$$
+DELIMITER ;
