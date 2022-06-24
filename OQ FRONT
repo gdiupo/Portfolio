@@ -1,0 +1,1355 @@
+<template>
+
+    <div id="page-user-edit">
+
+        <vx-card ref="filterCard" class="user-list-filters mb-4">
+            <div class="vx-row">
+                <div class="vx-col md:w-1/2 sm:w-1/2 w-full">
+                    <label class="text-md opacity-75">รหัสคำขอ</label>
+                    <vs-input class="w-full" v-model="booking_code" disabled name="booking_code"/>
+                </div>
+                <div class="vx-col md:w-1/2 sm:w-1/2 w-full">
+                    <label class="text-md opacity-75">วันที่คำขอ</label>
+                    <flat-pickr disabled :config="configFromdateTimePicker" format="format" class="w-full"
+                                v-model="created_at" @on-change="onFromChange"/>
+                </div>
+            </div>
+        </vx-card>
+        <vx-card ref="filterCard" class="user-list-filters mb-4">
+            <div class="vx-row">
+                <div class="vx-col md:w-1/2 sm:w-1/2 w-full">
+                    <label class="text-lg opacity-75">
+                        สถานะ : {{beds_status}}
+                        <span style="margin-left:25px; color:red;"
+                              v-show='rest_status_id == "2" '>
+                                หมายเหตุ : {{approve_reason}}
+                            </span>
+                    </label>
+                </div>
+            </div>
+        </vx-card>
+
+        <vx-card ref="filterCard" title="ข้อมูลนายจ้าง/สถานประกอบการ" class="user-list-filters mb-4" :titleBold="true">
+            <div class="vx-row">
+                <div class="vx-col md:w-1/2 sm:w-1/2 w-full">
+                    <label class="text-md opacity-75">ชื่อนายจ้าง/สถานประกอบการ</label>
+                    <vs-input disabled class="w-full" v-model="employer_name" name="employer_name"/>
+                    <span class="text-danger text-md" v-show="errors.has('reg_last_name')">{{ errors.first('reg_last_name') }}</span>
+                </div>
+                <div class="vx-col md:w-1/2 sm:w-1/2 w-full">
+                    <label class="text-md opacity-75">ประเภทกิจการ</label>
+                    <vs-input disabled class="w-full" v-model="business_type" name="business_type"/>
+                </div>
+            </div>
+            <div class="vx-row mt-2">
+                <div class="vx-col md:w-1/2 sm:w-1/2 w-full">
+                    <label class="text-md opacity-75">เลขบัตรประชาชน/เลขทะเบียนนิติบุคคล</label>
+                    <vs-input class="w-full" disabled name="employer_code" v-model="employer_code"/>
+                </div>
+                <div class="vx-col md:w-1/2 sm:w-1/2 w-full">
+                    <label class="text-md opacity-75">เบอร์ติดต่อ</label>
+                    <vs-input class="w-full" v-model="contact_number" disabled name="contact_number"/>
+                </div>
+            </div>
+            <div class="vx-row mt-2">
+                <div class="vx-col md:w-1/2 sm:w-1/2 w-full">
+                    <label class="text-md opacity-75">บ้านเลขที่</label>
+                    <vs-input class="w-full" v-model="address" disabled name="address"/>
+                </div>
+                <div class="vx-col md:w-1/2 sm:w-1/2 w-full">
+                    <label class="text-md opacity-75">หมู่</label>
+                    <vs-input class="w-full" v-model="moo" disabled name="moo"/>
+                </div>
+            </div>
+            <div class="vx-row mt-2">
+                <div class="vx-col md:w-1/2 sm:w-1/2 w-full">
+                    <label class="text-md opacity-75">ซอย</label>
+                    <vs-input class="w-full" v-model="soi" disabled name="soi"/>
+                </div>
+                <div class="vx-col md:w-1/2 sm:w-1/2 w-full">
+                    <label class="text-md opacity-75">ถนน</label>
+                    <vs-input class="w-full" v-model="street" disabled name="street"/>
+                </div>
+            </div>
+            <div class="vx-row mt-2">
+                <div class="vx-col md:w-1/2 sm:w-1/2 w-full">
+                    <label class="text-md opacity-75">จังหวัด</label>
+                    <v-select label="pv_dest" value="pv_code" :reduce="option => option.pv_code"
+                              :options="provinces" :clearable="false" disabled
+                              :dir="$vs.rtl ? 'rtl' : 'ltr'" v-model="province"
+                              class="mb-4 md:mb-0"/>
+
+                </div>
+                <div class="vx-col md:w-1/2 sm:w-1/2 w-full">
+                    <label class="text-md opacity-75">อำเภอ</label>
+                    <v-select label="pv_dest" value="pv_ampur" :reduce="option => option.pv_ampur"
+                              :options="ampurs" :clearable="false" disabled
+                              :dir="$vs.rtl ? 'rtl' : 'ltr'" v-model="district"
+                              class="mb-4 md:mb-0"/>
+                </div>
+            </div>
+            <div class="vx-row mt-2">
+                <div class="vx-col md:w-1/2 sm:w-1/2 w-full">
+                    <label class="text-md opacity-75">ตำบล</label>
+                    <v-select label="pv_dest" value="pv_tumbon"
+                              :options="tumbons" :clearable="false" disabled
+                              :dir="$vs.rtl ? 'rtl' : 'ltr'" v-model="subdistrict"
+                              class="mb-4 md:mb-0"/>
+                </div>
+                <div class="vx-col md:w-1/2 sm:w-1/2 w-full">
+                    <label class="text-md opacity-75">รหัสไปรษณีย์</label>
+                    <vs-input class="w-full" v-model="zip_code" disabled name="zip_code"/>
+                </div>
+            </div>
+        </vx-card>
+        <vx-card ref="filterCard" title="เอกสารแนบ" class="user-list-filters mb-4" :titleBold="true">
+            <div class="vx-row">
+                <div class="vx-col md:w-1/2 sm:w-1/2 w-full">
+                    <label class="text-md opacity-75">บัญชีรายชื่อแรงงานต่างด้าว สัญชาติเมียนมา</label>
+                </div>
+                <div class="vx-col md:w-1/2 sm:w-1/2 w-full">
+                    <feather-icon icon="SearchIcon" v-if="this.ref_file_list"
+                                  svgClasses="h-5 w-5 hover:text-primary cursor-pointer text-success"
+                                  v-on:click="getAttach(6)"/>
+                    <!--<label v-if="this.ref_file_list" class="text-md cursor-pointer text-success hover:text-primary"-->
+                    <!--v-on:click="getAttach(6)">{{filename_list}}</label>-->
+                </div>
+            </div>
+            <div class="vx-row">
+                <div class="vx-col md:w-1/2 sm:w-1/2 w-full">
+                    <label class="text-md opacity-75">หลักฐานการซื้อประกันสุขภาพ (โควิด-19)</label>
+                </div>
+                <div class="vx-col md:w-1/2 sm:w-1/2 w-full">
+                    <feather-icon icon="SearchIcon" v-if="this.ref_file_covid"
+                                  svgClasses="h-5 w-5 hover:text-primary cursor-pointer text-success"
+                                  v-on:click="getAttach(7)"/>
+                    <!--<label v-if="this.ref_file_covid" class="text-md cursor-pointer text-success hover:text-primary"-->
+                    <!--v-on:click="getAttach(6)">{{filename_covid}}</label>-->
+                </div>
+            </div>
+            <div class="vx-row">
+                <div class="vx-col md:w-1/2 sm:w-1/2 w-full">
+                    <label class="text-md opacity-75">หลักฐานการฉีดวัคซีนโควิด-19 ครบโดส</label>
+                </div>
+                <div class="vx-col md:w-1/2 sm:w-1/2 w-full">
+                    <feather-icon icon="SearchIcon" v-if="this.ref_file_vaccine"
+                                  svgClasses="h-5 w-5 hover:text-primary cursor-pointer text-success"
+                                  v-on:click="getAttach(9)"/>
+                    <!--<label v-if="this.ref_file_vaccine"-->
+                    <!--class="text-md cursor-pointer text-success hover:text-primary" v-on:click="getAttach(6)">{{filename_vaccine}}</label>-->
+                </div>
+            </div>
+        </vx-card>
+        <vx-card ref="filterCard" class="user-list-filters mb-4">
+            <div class="vx-row mt-4 mb-4">
+                <div class="vx-col md:w-1/2 sm:w-1/2 w-full">
+                    <label class="text-md opacity-75">จำนวนทั้งหมด (คน) <font
+                            color=red> * </font></label>
+                    <vs-input type="number" class="w-full" v-model="total_person"
+                              v-validate="'required'"
+                              name="total_person"/>
+                    <span class="text-danger text-md"
+                          v-show="errors.has('total_person')">{{ errors.first('total_person') }}</span>
+                </div>
+            </div>
+            <label class="text-md opacity-80 mt-2">จำนวนทั้งหมดที่เข้ารับการกักกันจริง</label>
+            <div class="vx-row mb-2">
+                <div class="vx-col md:w-1/3 sm:w-1/3 w-full">
+                    <label class="text-md opacity-75">ชาย (คน)</label>
+                    <vs-input class="w-full" v-model="total_male" disabled name="total_male"/>
+                </div>
+                <div class="vx-col md:w-1/3 sm:w-1/3 w-full">
+                    <label class="text-md opacity-75">หญิง (คน)</label>
+                    <vs-input class="w-full" v-model="total_female" disabled name="total_female"/>
+                </div>
+                <div class="vx-col md:w-1/3 sm:w-1/3 w-full">
+                    <label class="text-md opacity-75">รวม (คน)</label>
+                    <vs-input class="w-full" v-model="real_total_person" disabled name="total"/>
+                </div>
+            </div>
+            <!-- <vs-table v-if="absent_list.length != 0" :data="absent_list"> -->
+            <vs-table :data="all_person_absent" class="mt-4">
+                <template slot="header" class="mt-2">
+                    <div class="vx-row">
+                        <div class="vx-col w-full">
+                            <label class="text-md opacity-80 mt-2">แรงงานต่างด้าว ที่ไม่มาเข้าสถานกักกันฯ (OQ) ตามบัญชีรายชื่อแรงงานต่างด้าว สัญชาติเมียนมา</label>
+                            <!--<vs-input hidden class="w-full" v-model="check_absent"-->
+                                      <!--name="check_absent"/>-->
+                            <!--<span class="text-danger text-md" v-show="errors.has('check_absent')">{{ errors.first('check_absent') }}</span>-->
+                        </div>
+                    </div>
+                </template>
+                <template slot="thead">
+                    <vs-th class="flex justify-center">
+                        ลำดับที่
+                    </vs-th>
+                    <vs-th>
+                        ชื่อจริง
+                    </vs-th>
+                    <vs-th>
+                        นามสกุล
+                    </vs-th>
+                    <vs-th>
+                        รหัสพาสปอร์ต
+                    </vs-th>
+                    <!--<vs-th>-->
+                        <!--วัน/เดือน/ปี เกิด(ค.ศ.)-->
+                    <!--</vs-th>-->
+                </template>
+
+                <template slot-scope="{data}">
+                    <vs-tr :key="indextr" v-for="(tr, indextr) in data">
+                        <vs-td class="flex justify-center">
+                            {{indextr + 1}}
+                        </vs-td>
+                        <vs-td :data="tr.first_name">
+                            <vs-input disabled :value="tr.first_name" class="inputx" />
+                        </vs-td>
+                        <vs-td :data="tr.last_name">
+                            <vs-input disabled :value="tr.last_name" class="inputx" />
+                        </vs-td>
+                        <vs-td :data="tr.passport">
+                            <vs-input disabled :value="tr.passport" class="inputx" />
+                        </vs-td>
+                        <!--<vs-td :data="tr.birth_date">-->
+                            <!--<flat-pickr :config="configFrombirthdateTimePicker"-->
+                                        <!--format="format" class="w-full" disabled-->
+                                        <!--data-vv-name="birth_date"-->
+                                        <!--v-model="tr.birth_date"/>-->
+                        <!--</vs-td>-->
+                    </vs-tr>
+                </template>
+            </vs-table>
+        </vx-card>
+
+        <vx-card ref="filterCard" class="user-list-filters mb-4">
+            <div class="vx-row">
+                <div class="vx-col md:w-1/2 sm:w-1/2 w-full">
+                    <label class="text-md opacity-75">กำหนดวันเข้าศูนย์</label>
+                    <flat-pickr disabled :config="configFromdateTimePicker" format="format"
+                                class="w-full" v-model="check_in_date" @on-change="onFromChange"/>
+                </div>
+                <div class="vx-col md:w-1/2 sm:w-1/2 w-full">
+                    <label class="text-md opacity-75">ถึงวันที่</label>
+                    <flat-pickr disabled :config="configFromdateTimePicker" format="format"
+                                class="w-full" v-model="check_out_date" @on-change="onFromChange"/>
+                </div>
+            </div>
+        </vx-card>
+        <vx-card ref="filterCard" class="user-list-filters mb-4">
+            <div class="vx-row">
+                <div class="vx-col md:w-1/2 sm:w-1/2 w-full">
+                    <vs-button color="primary" type="filled" target :href="link_list">ข้อมูลเตียงว่าง ณ วันเข้าศูนย์
+                    </vs-button>
+                </div>
+            </div>
+        </vx-card>
+        <vx-card ref="filterCard" class="user-list-filters mb-4">
+            <vs-table :data="mal_Booking_beds">
+                <template slot="header">
+                    <div class="vx-row ml-2">
+                        <h4 class="text-bold">รายชื่อผู้เข้าพัก เพศ ชาย</h4>
+                        <vs-input hidden class="w-full" v-model="check_male" v-validate="validation_male_rule"
+                                  name="check_male"/>
+                        <span class="text-danger text-md"
+                              v-show="errors.has('check_male')">{{ errors.first('check_male') }}</span>
+                    </div>
+                </template>
+                <template slot="thead">
+                    <vs-th class="flex justify-center">
+                        ลำดับที่
+                    </vs-th>
+                    <vs-th>
+                        ชื่อจริง
+                    </vs-th>
+                    <vs-th>
+                        นามสกุล
+                    </vs-th>
+                    <vs-th>
+                        รหัสพาสปอร์ต
+                    </vs-th>
+                    <vs-th>
+                        วัน/เดือน/ปี เกิด(ค.ศ.)
+                    </vs-th>
+                    <vs-th>
+                        สถานที่เกิด
+                    </vs-th>
+                    <vs-th>
+                        เตียง
+                    </vs-th>
+                    <vs-th>
+                    </vs-th>
+                </template>
+
+                <template slot-scope="{data}">
+                    <vs-tr :key="indextr" v-for="(tr, indextr) in data">
+                        <vs-td class="flex justify-center">
+                            {{indextr + 1}}
+                        </vs-td>
+                        <vs-td :data="tr.first_name">
+                            <vs-input :value="tr.first_name" class="inputx"
+                                      @input="v => { tr.first_name = v.toUpperCase() }" maxlength = "100"/>
+                        </vs-td>
+                        <vs-td :data="tr.last_name">
+                            <vs-input :value="tr.last_name" class="inputx"
+                                      @input="v => { tr.last_name = v.toUpperCase() }" maxlength = "100"/>
+                        </vs-td>
+                        <vs-td :data="tr.passport">
+                            <vs-input :value="tr.passport" class="inputx"
+                                      @input="v => { tr.passport = v.toUpperCase() }"maxlength = "15"/>
+                        </vs-td>
+                        <vs-td :data="tr.birth_date">
+                            <flat-pickr :config="configFrombirthdateTimePicker"
+                                        format="format" class="inputx"
+                                        v-validate="'required'" data-vv-name="birth_date"
+                                        v-model="tr.birth_date"
+                                        :data-index-number="indextr"
+                                        @on-close="flatpickrBirthdateClose1"  />
+                        </vs-td>
+                        <vs-td :data="tr.birth_location">
+                            <vs-input :value="tr.birth_location" class="inputx"
+                                      @input="v => { tr.birth_location = v.toUpperCase() }" maxlength = "50"/>
+                        </vs-td>
+                        <vs-td :data="tr.bed_code">
+                            <vs-input :value="tr.bed_code" class="inputx bedsize"
+                                      @input="v => { tr.bed_code = v.toUpperCase() }" :maxlength="5"/>
+                        </vs-td>
+                        <vs-td>
+                            <feather-icon icon="ZapIcon"
+                                          @click=" current_gender=1; current_index=indextr;popupActive2=true ;max_bed =(mal_Booking_bed.length-indextr)"
+                                          color="primary" type="filled">Open
+                            </feather-icon>
+
+                            <vs-popup classContent="popup-example" title="กำหนด อาคาร ชั้น ห้อง เริ่มต้น"
+                                      :active.sync="popupActive2">
+                                <div class="vx-row">
+                                    <div class="vx-col md:w-1/2 sm:w-1/2 w-full">
+                                        <label class="w-full">อาคาร<font color=red> * </font></label>
+                                        <v-select label="building_name"
+                                                  value="building_code"
+                                                  :reduce="option => option.building_code" :options="buildings"
+                                                  :clearable="false" :dir="$vs.rtl ? 'rtl' : 'ltr'"
+                                                  :counter-danger.sync="counterDanger"
+                                                  v-model="p_building_code"
+                                                  data-vv-name="p_building_code"
+                                                  name="building" class="mb-4 md:mb-0"
+                                                  data-vv-scope="vpopup"
+                                                  v-validate="c_building"/>
+                                        <span class="text-danger text-md"
+                                              v-show="errors.has('vpopup.p_building_code')">กรุณาระบุอาคาร</span>
+                                    </div>
+                                    <div class="vx-col md:w-1/2 sm:w-1/2 w-full">
+                                        <label class="w-full">ชั้น<font color=red> * </font></label>
+                                        <vs-input class="inputx mb-3" v-model="p_floor"
+                                                  v-validate="c_floor"
+                                                  data-vv-name="p_floor"
+                                                  data-vv-scope="vpopup"
+                                                  :counter-danger.sync="counterDanger"/>
+                                        <span class="text-danger text-md"
+                                              v-show="errors.has('vpopup.p_floor')">กรุณาระบุชั้น</span>
+                                    </div>
+                                </div>
+                                <div class="vx-row mt-2">
+                                    <div class="vx-col md:w-1/2 sm:w-1/2 w-full">
+                                        <label class="w-full">ห้อง<font color=red> * </font></label>
+                                        <vs-input class="w-full" v-model="p_room"
+                                                  v-validate="c_room"
+                                                  data-vv-name="p_room"
+                                                  data-vv-scope="vpopup"
+                                                  :counter-danger.sync="counterDanger"/>
+                                        <span class="text-danger text-md"
+                                              v-show="errors.has('vpopup.p_room')">กรุณาระบุห้อง</span>
+                                    </div>
+                                    <div class="vx-col md:w-1/2 sm:w-1/2 w-full">
+                                        <label class="w-full">จำนวนเตียง(สูงสุด {{max_bed}} )<font
+                                                color=red> * </font></label>
+                                        <vs-input class="inputx mb-3" v-model="p_count"
+                                                  v-validate="c_count"
+                                                  data-vv-name="p_count"
+                                                  data-vv-scope="vpopup"
+                                                  :counter-danger.sync="counterDanger"/>
+                                        <span class="text-danger text-md"
+                                              v-show="errors.has('vpopup.p_count')">กรุณาระบุจำนวนเตียงที่ต้องการให้ถูกต้อง</span>
+                                    </div>
+                                </div>
+                                <div class="vx-row mt-4">
+                                    <div class="vx-col w-full text-right">
+                                        <vs-button @click="autoBed()" color="primary" type="filled">ยืนยัน</vs-button>
+                                    </div>
+                                </div>
+                            </vs-popup>
+                        </vs-td>
+                    </vs-tr>
+                </template>
+            </vs-table>
+        </vx-card>
+        <vx-card ref="filterCard" class="user-list-filters mb-4">
+            <vs-table :data="femal_Booking_beds">
+                <template slot="header">
+                    <div class="vx-row ml-2">
+                        <h4 class="text-bold">รายชื่อผู้เข้าพัก เพศ หญิง</h4>
+                        <vs-input hidden class="w-full" v-model="check_female" v-validate="validation_female_rule"
+                                  name="check_female"/>
+                        <span class="text-danger text-md" v-show="errors.has('check_female')">{{ errors.first('check_female') }}</span>
+                    </div>
+                </template>
+                <template slot="thead">
+                    <vs-th class="flex justify-center">
+                        ลำดับที่
+                    </vs-th>
+                    <vs-th>
+                        ชื่อจริง
+                    </vs-th>
+                    <vs-th>
+                        นามสกุล
+                    </vs-th>
+                    <vs-th>
+                        รหัสพาสปอร์ต
+                    </vs-th>
+                    <vs-th>
+                        วัน/เดือน/ปี เกิด(ค.ศ.)
+                    </vs-th>
+                    <vs-th>
+                        สถานที่เกิด
+                    </vs-th>
+                    <vs-th>
+                        เตียง
+                    </vs-th>
+                    <vs-th>
+                    </vs-th>
+                </template>
+
+                <template slot-scope="{data}">
+                    <vs-tr :key="indextr" v-for="(tr, indextr) in data">
+                    <vs-td class="flex justify-center">
+                        {{indextr + 1}}
+                    </vs-td>
+                    <vs-td :data="tr.first_name">
+                        <vs-input :value="tr.first_name" class="inputx"
+                                  @input="v => { tr.first_name = v.toUpperCase() }" maxlength = "100"/>
+                    </vs-td>
+                    <vs-td :data="tr.last_name">
+                        <vs-input :value="tr.last_name" class="inputx"
+                                  @input="v => { tr.last_name = v.toUpperCase() }" maxlength = "100"/>
+                    </vs-td>
+                    <vs-td :data="tr.passport">
+                        <vs-input :value="tr.passport" class="inputx"
+                                  @input="v => { tr.passport = v.toUpperCase() }"maxlength = "15"/>
+                    </vs-td>
+                    <vs-td :data="tr.birth_date">
+                        <flat-pickr :config="configFrombirthdateTimePicker"
+                                    format="format" class="inputx"
+                                    v-validate="'required'" data-vv-name="birth_date"
+                                    v-model="tr.birth_date"
+                                    :data-index-number="indextr"
+                                    @on-close="flatpickrBirthdateClose2"  />
+                    </vs-td>
+                    <vs-td :data="tr.birth_location">
+                        <vs-input :value="tr.birth_location" class="inputx"
+                                  @input="v => { tr.birth_location = v.toUpperCase() }" maxlength = "50"/>
+                    </vs-td>
+                    <vs-td :data="tr.bed_code">
+                        <vs-input :value="tr.bed_code" class="inputx bedsize"
+                                  @input="v => { tr.bed_code = v.toUpperCase() }" :maxlength="5"/>
+                    </vs-td>
+                    <vs-td>
+
+                            <feather-icon icon="ZapIcon"
+                                          @click=" current_gender=2; current_index=indextr;popupActive4=true ;max_bed =(femal_Booking_bed.length-indextr)"
+                                          color="primary" type="filled">Open
+                            </feather-icon>
+
+                            <vs-popup classContent="popup-example" title="กำหนด อาคาร ชั้น ห้อง เริ่มต้น"
+                                      :active.sync="popupActive4">
+                                <div class="vx-row">
+                                    <div class="vx-col md:w-1/2 sm:w-1/2 w-full">
+                                        <label class="text-md opacity-75">อาคาร<font color=red> * </font></label>
+                                        <v-select label="building_name"
+                                                  value="building_code"
+                                                  :reduce="option => option.building_code" :options="buildings"
+                                                  :clearable="false" :dir="$vs.rtl ? 'rtl' : 'ltr'"
+                                                  :counter-danger.sync="counterDanger"
+                                                  v-model="p_building_code"
+                                                  data-vv-name="p_building_code"
+                                                  data-vv-scope="vpopup"
+                                                  name="building" class="w-full"
+                                                  v-validate="c_building"/>
+                                        <span class="text-danger text-md"
+                                              v-show="errors.has('vpopup.p_building_code')">กรุณาระบุอาคาร</span>
+                                    </div>
+                                    <div class="vx-col md:w-1/2 sm:w-1/2 w-full">
+                                        <label class="text-md opacity-75">ชั้น<font color=red> * </font></label>
+                                        <vs-input class="w-full" v-model="p_floor"
+                                                  v-validate="c_floor"
+                                                  data-vv-name="p_floor"
+                                                  data-vv-scope="vpopup"
+                                                  :counter-danger.sync="counterDanger"/>
+                                        <span class="text-danger text-md"
+                                              v-show="errors.has('vpopup.p_floor')">กรุณาระบุชั้น</span>
+                                    </div>
+                                </div>
+                                <div class="vx-row mt-2">
+                                    <div class="vx-col md:w-1/2 sm:w-1/2 w-full">
+                                        <label class="text-md opacity-75">ห้อง<font color=red> * </font></label>
+                                        <vs-input class="w-full" v-model="p_room"
+                                                  v-validate="c_room"
+                                                  data-vv-name="p_room"
+                                                  data-vv-scope="vpopup"
+                                                  :counter-danger.sync="counterDanger"/>
+                                        <span class="text-danger text-md"
+                                              v-show="errors.has('vpopup.p_room')">กรุณาระบุห้อง</span>
+                                    </div>
+                                    <div class="vx-col md:w-1/2 sm:w-1/2 w-full">
+                                        <label class="text-md opacity-75">จำนวนเตียง(สูงสุด {{max_bed}} )<font
+                                                color=red> * </font></label>
+                                        <vs-input class="w-full" v-model="p_count"
+                                                  v-validate="c_count"
+                                                  data-vv-name="p_count"
+                                                  data-vv-scope="vpopup"
+                                                  :counter-danger.sync="counterDanger"/>
+                                        <span class="text-danger text-md"
+                                              v-show="errors.has('vpopup.p_count')">กรุณาระบุจำนวนเตียงที่ต้องการให้ถูกต้อง</span>
+                                    </div>
+                                </div>
+                                <div class="vx-row mt-4">
+                                    <div class="vx-col w-full text-right">
+                                        <vs-button @click="autoBed()" color="primary" type="filled">ยืนยัน</vs-button>
+                                    </div>
+                                </div>
+                            </vs-popup>
+                        </vs-td>
+
+
+                    </vs-tr>
+
+                </template>
+            </vs-table>
+        </vx-card>
+
+
+        <div class="vx-row mt-4">
+            <div class="vx-col md:w-1/2 sm:w-1/2 w-full text-left">
+                <vs-button color="primary" type="line" icon="reply" to="/db/guesnormal" @click.stop.prevent>ย้อนกลับ
+                </vs-button>
+            </div>
+            <div class="vx-col md:w-1/2 sm:w-1/2 w-full text-right">
+                <vs-button class="ml-auto mt-2" @click="submitForm()" v-show="vShow">&nbsp;&nbsp;บันทึก&nbsp;&nbsp;</vs-button>
+                <vs-button class="ml-4 mt-2" type="border" color="warning" @click="reset_data">เริ่มใหม่</vs-button>
+            </div>
+        </div>
+    </div>
+</template>
+
+<script>
+    import axios from "@/axios.js"
+    import vSelect from 'vue-select'
+    import {Validator} from 'vee-validate';
+    import flatPickr from 'vue-flatpickr-component';
+    import 'flatpickr/dist/flatpickr.css';
+    import {Thai as ThaiLocale} from 'flatpickr/dist/l10n/th.js';
+    import bnl from "@/bnl" ; //import bnl
+
+    var d1 = new Date();
+    var docdate = d1.getDate() + "/" + (d1.getMonth() + 1) + "/" + (d1.getFullYear() + 543);
+
+    //*Check Digit*//
+    Validator.extend('digitID', {
+        // Custom validation message
+        getMessage: (field) => `กรุณาระบุเลขที่บัตรประชาชนให้ถูกต้อง`,
+
+        // Custom validation rule
+        validate: (value) => {
+            var vc = false;
+            if (value.length == 13) {
+                //check digit value
+                var iPID = value.replace(/-/g, "");
+                var Validchk = iPID.substr(12, 1);
+                var j = 0;
+                var pidcut;
+                var total = 0;
+                for (var n = 0; n < 12; n++) {
+                    pidcut = parseInt(iPID.substr(j, 1));
+                    total = (total + ((pidcut) * (13 - n)));
+                    j++;
+                }
+                var chk = 11 - (total % 11);
+                if (chk == 10) {
+                    chk = 0;
+                } else if (chk == 11) {
+                    chk = 1;
+                }
+                if (chk == Validchk) {
+                    vc = true;
+                } else {
+                    vc = false;
+                }
+            }
+            return vc;
+            // if (vc) {
+            //     resolve({valid: true});
+            // } else {
+            //     reject({valid: false});
+            // }
+            //})
+        }
+    });
+    const dict = {
+        custom: {
+
+            booking_status_id: {required: 'กรุณาตรวจสอบการจองคิว'},
+            p_building: {required: 'กรุณาระบุอาคารตั้งต้น'},
+            p_floor: {required: 'กรุณาระบุชั้นตั้งต้น'},
+            p_room: {required: 'กรุณาระบุห้องตั้งต้น'},
+            p_count: {required: 'กรุณาระบุจำนวนเตียง'},
+            check_male: {required: 'กรุณากรอกข้อมูลให้ครบถ้วน'},
+            check_female: {required: 'กรุณากรอกข้อมูลให้ครบถ้วน'},
+        }
+    };
+    Validator.localize('th', dict);
+
+    export default {
+        components: {
+            vSelect,
+            flatPickr,
+        },
+        data() {
+            return {
+
+                p_building_code: '',
+                p_floor: 1,
+                p_room: 1,
+                p_count: 1,
+                counterDanger: true,
+                popupActive2: false,
+                popupActive3: false,
+                popupActive4: false,
+                popupActive5: false,
+                r_data: [],
+                max_bed: 0,
+
+                absent_list: [],
+                current_index: 0,
+                current_gender: null,
+
+                buildings: [],
+                building: '',
+
+                booking_code: '',
+                employer_name: '',
+                employer_code: '',
+                employer_id: '',
+                contact_number: '',
+                total_person: '',
+                total_male: '',
+                total_female: '',
+                rest_status_id: '',
+                packages: [],
+                package_id: '',
+                deposit_amount1: '',
+                check_in_date: '',
+                check_out_date: '',
+                book_status_id: '',
+                created_at: '',
+                zone_id: '',
+
+                booking_status_id: '',
+
+                business_type: '',
+                address: '',
+                moo: '',
+                soi: '',
+                street: '',
+                district: '',
+                subdistrict: null,
+                province: '',
+                zip_code: '',
+                provinces: [],
+                ampurs: [],
+                tumbons: [],
+
+                mal_Booking_bed: [],
+                femal_Booking_bed: [],
+                all_person_absent: [],
+
+                file_list: '',
+                attach_file_list: '',
+                ref_file_list: '',
+                filename_list: '',
+                file_covid: '',
+                attach_file_covid: '',
+                ref_file_covid: '',
+                filename_covid: '',
+                attach_id_vaccine: '',
+                attach_file_vaccine: '',
+                ref_file_vaccine: '',
+                filename_vaccine: '',
+
+
+                // old
+                configFromdateTimePicker: {
+                    locale: ThaiLocale,
+                    dateFormat: 'd/m/X',
+                    minDate: null,
+                    // allowInput: true,
+                    altFormat: 'X-m-d'
+                },
+                check_male: '',
+                check_female: '',
+
+                booking_in_date: '',
+                booking_out_date: '',
+
+                is_working: false,
+                approve_reason:'',
+                beds_status:'',
+            }
+        },
+        methods: {
+
+            autoBed(index) {
+
+                this.$validator.validateAll("vpopup").then(result => {
+
+
+                    if (result) {
+                        if (this.current_gender == 1) {
+                            for (var i = this.current_index - 0; i < ((this.current_index - 0) + (this.p_count - 0)); i++) {
+                                this.mal_Booking_bed[i].bed_code = null;
+                            }
+                        }
+
+                        if (this.current_gender == 2) {
+
+                            for (var i = this.current_index - 0; i < ((this.current_index - 0) + (this.p_count - 0)); i++) {
+
+                                this.femal_Booking_bed[i].bed_code = null;
+                            }
+                        }
+                        axios.post('/api/db/checkbookingnormal/list_bed_free/' + this.$route.params.id, {
+                            // city_code:this.city_code,
+                            booking_in_date: this.check_in_date,
+                            booking_out_date: this.check_out_date,
+                            zone_id: this.zone_id,
+                            building_code: this.p_building_code,
+                            floor: this.p_floor,
+                            room: this.p_room,
+                            count: this.p_count,
+                            mal_Booking_bed: this.mal_Booking_bed,
+                            femal_Booking_bed: this.femal_Booking_bed,
+
+                        })
+                            .then(response => {
+
+
+                                this.r_data = response.data.data;
+
+                                if (this.current_gender == 1) {
+
+
+                                    for (var i = this.current_index - 0; i < ((this.current_index - 0) + (this.p_count - 0)); i++) {
+                                        if (i - (this.current_index - 0) >= this.r_data.length) {
+                                            break;
+                                        }
+                                        this.mal_Booking_bed[i].bed_code = this.r_data[i - this.current_index].bed_code;
+                                    }
+                                }
+                                if (this.current_gender == 2) {
+                                    for (var i = this.current_index - 0; i < ((this.current_index - 0) + (this.p_count - 0)); i++) {
+                                        if (i - (this.current_index - 0) >= this.r_data.length) {
+                                            break;
+                                        }
+                                        this.femal_Booking_bed[i].bed_code = this.r_data[i - this.current_index].bed_code;
+                                    }
+                                }
+
+                            })
+
+                            .catch(e => console.log(e,
+                                this.erropenAlert(
+                                    'danger',
+                                    'เกิดข้อผิดพลาดเนื่องจาก ' + e.response.data.message)
+                            ));
+
+
+                        this.popupActive2 = false;
+                        this.popupActive4 = false;
+                    }
+                })
+
+            },
+
+            getAttach(attach_type) {
+                let url = '/master/vg/';
+                if (attach_type == 6) {
+                    url = url + this.attach_file_list + '/' + this.ref_file_list
+                } else if (attach_type == 7) {
+                    url = url + this.attach_file_covid + '/' + this.ref_file_covid
+                } else if (attach_type == 8) {
+                    url = url + this.attach_id_attachment + '/' + this.user_attachment
+                } else if (attach_type == 9) {
+                    url = url + this.attach_file_vaccine + '/' + this.ref_file_vaccine
+                }
+                // else if (attach_type == 3) {
+                //     url = url + this.attach_id_pic + '/' + this.ref_pic
+                // }
+                // else if (attach_type == 4) {
+                //     url = url + this.attach_id_foreigner + '/' + this.ref_foreigner
+                // } else if (attach_type == 5) {
+                //     url = url + this.attach_id_certificate + '/' + this.ref_certificate
+                // }
+
+                // console.log("url" + url);
+                var win = window.open(url, '_blank');
+                win.focus();
+                //console.log('getAttach function');
+            },
+
+            onFromChange(selectedDates, dateStr, instance) {
+            },
+            handleFileUpload() {
+                this.file_list = this.$refs.ref_file_list.files[0];
+                // console.log(this.$refs.reg_file_idcard);
+                // console.log(this.digital_signature);
+            },
+            handleInsuranceUpload() {
+                this.file_covid = this.$refs.ref_file_covid.files[0];
+            },
+            // handleFilePicUpload() {
+            //     this.reg_file_pic = this.$refs.reg_file_pic.files[0];
+            // },
+            // handleFileforeignerUpload() {
+            //     this.reg_file_foreigner = this.$refs.reg_file_foreigner.files[0];
+            // },
+            // handleFileCertificateUpload() {
+            //     this.reg_file_certificate = this.$refs.reg_file_certificate.files[0];
+            // },
+            loadProvinces() {
+                axios.get('/master/provinces')
+                    .then(response => {
+                        this.provinces = response.data;
+                    })
+                    .catch(err => console.log(err));
+            },
+            loadAmpurs(pv_code) {
+                this.$vs.loading()
+                axios.get('/master/ampur/' + pv_code)
+                    .then(response => {
+                        this.$vs.loading.close();
+                        this.ampurs = response.data;
+                        if (!this.is_working) {
+                            this.district = '';
+                        }
+
+                    })
+                    .catch(err => console.log(err));
+            },
+            loadTumbons(pv_code, am_code) {
+                this.$vs.loading()
+                axios.get('/master/tumbon/' + pv_code + '/' + am_code)
+                    .then(response => {
+                        this.$vs.loading.close();
+                        this.tumbons = response.data;
+                        if (!this.is_working) {
+                            this.subdistrict = null;
+                            this.zip_code = '';
+                        }
+                    })
+                    .catch(err => console.log(err));
+            },
+            // ClearPidMsg() {
+            //     this.checkpid = '';
+            //     this.checkpid_msg = '';
+            //     this.pull_msg = '';
+            //     this.dpis_found = '';
+            // },
+
+            checkDuplicate(arry) {
+                return new Set(arry).size < arry.length
+            },
+            passport2Array() {
+                let arr = []
+                for (let i = 0; i < this.mal_Booking_bed.length; i++) {
+                    arr.push(this.mal_Booking_bed[i].passport);
+                }
+                for (let i = 0; i < this.femal_Booking_bed.length; i++) {
+                    arr.push(this.femal_Booking_bed[i].passport);
+                }
+                return arr;
+            },
+            bed2Array() {
+                let arr = []
+                for (let i = 0; i < this.mal_Booking_bed.length; i++) {
+                    arr.push(this.mal_Booking_bed[i].bed_code);
+                }
+                for (let i = 0; i < this.femal_Booking_bed.length; i++) {
+                    arr.push(this.femal_Booking_bed[i].bed_code);
+                }
+                return arr;
+            },
+            submitForm() {
+                this.$validator.validateAll().then(result => {
+                    if (result) {
+                        //check duplicate passport and bed
+                        let passportArray = this.passport2Array();
+                        let bedArray = this.bed2Array();
+                        let check_passport = this.checkDuplicate(passportArray);
+                        let check_bed = this.checkDuplicate(bedArray);
+                        console.log('check_passport:' + check_passport);
+                        console.log('check_bed:' + check_bed);
+                        if (check_passport) {
+                            this.$vs.dialog({
+                                type: 'confirm',
+                                color: 'danger',
+                                title: `พบข้อผิดพลาด`,
+                                text: `มีข้อมูลหมายเลข Passport ซ้ำซ้อน`,
+                                acceptText: "ตกลง"
+                            });
+                            return;
+                        }
+                        if (check_bed) {
+                            this.$vs.dialog({
+                                type: 'confirm',
+                                color: 'danger',
+                                title: `พบข้อผิดพลาด`,
+                                text: `มีข้อมูลเตียงซ้ำซ้อน`,
+                                acceptText: "ตกลง"
+                            });
+                            return;
+                        }
+
+                        this.confirmSave(1, 1);
+                    } else {
+
+                        this.$vs.dialog({
+                            type: 'confirm',
+                            color: 'danger',
+                            title: `พบข้อผิดพลาด`,
+                            text: `กรุณากรอกข้อมูลให้ครบถ้วน`,
+                            acceptText: "ตกลง"
+                        });
+                        // Run after the next update cycle
+                        this.$nextTick(() => {
+                            const el = document.querySelector(".text-danger.text-md:first-of-type:not([style*=\"display:none\"]):not([style*=\"display: none\"]");
+                            el.scrollIntoView({behavior: "smooth", block: "center", inline: "nearest"});
+                            return;
+                        });
+
+                        // form have errors
+                    }
+                })
+            },
+
+            UpdateDataset(parameters) {
+                // console.log('update working');
+                let formData = new FormData();
+                // 'booking_status_id': this.booking_status_id,
+                // 'approve_reason': this.approve_reason
+                formData.append('mal_Booking_bed', JSON.stringify(this.mal_Booking_bed));
+                formData.append('femal_Booking_bed', JSON.stringify(this.femal_Booking_bed));
+                formData.append('booking_in_date', this.check_in_date);
+                formData.append('booking_out_date', this.check_out_date);
+                formData.append('rest_status_id', '1');
+                formData.append('approve_reason', this.approve_reason);
+
+                axios.post('/api/db/checkbookingnormal/' + this.$route.params.id + "?_method=PUT",
+                    formData,
+                    {
+                        headers: {
+                            'Content-Type': 'multipart/form-data'
+                        }
+                    })
+                    .then(
+                        r => {
+                            console.log(r);
+                            this.openAlert('success', 'บันทึกข้อมูลเรียบร้อย');
+                        }
+                    )
+                    // Ex.
+                    .catch(
+                        e => {
+                            console.log(e)
+                            console.log(e.response)
+                            if (e.response.status == 425) {
+                                let message = 'ไม่สามารถบันทึกข้อมูลได้เนื่องจาก ' + e.response.data.message;
+                                //loop
+                                let v_bed_free = e.response.data.bed_free;
+                                for (let i = 0; i < v_bed_free.length; i++) {
+                                    if (i > 0) {
+                                        message = message + ' , '
+                                    }
+                                    message = message + ' ' + v_bed_free[i].bed_code
+                                }
+                                this.openAlertErr('danger', message)
+                            } else {
+                                this.openAlertErr('danger', 'ไม่สามารถบันทึกข้อมูลได้เนื่องจาก ' + e.response.data.message)
+                            }
+                        });
+
+            },
+            confirmSave(id, publickey) {
+                this.$vs.dialog({
+                    type: 'confirm',
+                    color: 'success',
+                    title: `ยืนยันการบันทึกข้อมูล`,
+                    text: `คุณต้องการบันทึกข้อมูลนี้หรือไม่? `,
+                    accept: this.UpdateDataset,
+                    parameters: [id, publickey],
+                    acceptText: "ตกลง"
+                })
+            },
+            reset_data() {
+                location.reload();
+            },
+            openAlert(color, msg) {
+                this.colorAlert = color,
+                    this.msg = msg,
+                    this.$vs.dialog({
+                        color: this.colorAlert,
+                        title: `ผลการบันทึก`,
+                        text: msg,
+                        acceptText: "ตกลง",
+                        accept: this.acceptAlert
+                    })
+            },
+            acceptAlert() {
+                this.$vs.notify({
+                    color: this.colorAlert,
+                    title: 'ผลการบันทึก',
+                    text: this.msg
+                })
+                window.location.href = "/db/guesnormal"
+            },
+            openAlertErr(color, msg) {
+                this.colorAlert = color,
+                    this.msg = msg,
+                    this.$vs.dialog({
+                        color: this.colorAlert,
+                        title: `ผลการบันทึก`,
+                        text: msg,
+                        acceptText: "ตกลง",
+                    })
+            },
+            openAlertUrlErr(color, msg) {
+                this.colorAlert = color,
+                    this.msg = msg,
+                    this.$vs.dialog({
+                        color: this.colorAlert,
+                        title: `ข้อผิดพลาด`,
+                        text: msg,
+                        acceptText: "ตกลง",
+                        accept: this.acceptAlertUrlErr
+                    })
+            },
+
+            acceptAlertUrlErr() {
+                this.$vs.notify({
+                    color: this.colorAlert,
+                    title: 'ข้อผิดพลาด',
+                    text: this.msg
+                })
+                window.location.href = "/db/guesnormal"
+            },
+
+            selDataset(booking_id) {
+                this.is_working = true;
+                axios.get('/api/db/checkbookingnormal/' + booking_id).then(response => {
+                    var ds = response.data.data;
+                    this.booking_code = ds.booking_code;
+                    this.created_at = ds.created_date;
+                    this.total_male = ds.total_male;
+                    this.total_female = ds.total_female;
+                    this.total_person = ds.total_person;
+                    this.rest_status_id = ds.rest_status_id;
+                    this.package_name = ds.package_name;
+                    this.approve_reason = ds.approve_reason;
+                    this.beds_status = ds.beds_status;
+                    this.zone_id = ds.zone_id;
+                    this.package_id = {
+                        id: ds.package_id,
+                        package_day: ds.package_day,
+                        package_name: ds.package_name,
+                        limit_date_end: ds.limit_date_end,
+                        limit_date_start: ds.limit_date_start,
+                    }
+                    this.limit_date_end = ds.limit_date_end,
+                        this.limit_date_start = ds.limit_date_start,
+
+                        this.deposit_amount1 = ds.deposit_amount1;
+                    this.check_in_date = ds.check_in_date;
+                    this.check_out_date = ds.check_out_date;
+                    // console.log('check_in_date ' + typeof this.check_in_date);
+                    this.employer_id = ds.employer_id;
+                    this.business_type = ds.business_type;
+                    this.employer_name = ds.employer_name;
+                    this.employer_code = ds.employer_code;
+                    this.contact_number = ds.contact_number;
+                    this.booking_in_date = ds.check_in_date;
+                    this.booking_out_date = ds.check_out_date;
+
+
+                    this.address = ds.address;
+                    this.moo = ds.moo;
+                    this.soi = ds.soi;
+                    this.street = ds.street;
+
+                    this.district = ds.district;
+                    this.subdistrict = {
+                        pv_dest: ds.subdistrict_name,
+                        pv_tumbon: ds.subdistrict,
+                        pv_zipcode: ds.zip_code
+                    };
+                    this.province = ds.province;
+                    this.zip_code = ds.zip_code;
+
+                    this.booking_status_id = ds.booking_status_id;
+
+
+                    this.attach_file_list = ds.attach_id_list;
+                    this.ref_file_list = ds.file_list;
+                    this.filename_list = ds.filename_list;
+
+                    this.attach_file_covid = ds.attach_id_covid;
+                    this.ref_file_covid = ds.file_covid;
+                    this.filename_covid = ds.filename_covid;
+
+                    this.attach_file_vaccine = ds.attach_id_vaccine;
+                    this.ref_file_vaccine = ds.file_vaccine;
+                    this.filename_vaccine = ds.filename_vaccine;
+
+                    // this.ref_certificate = ds.reg_file_certificate;
+                    // this.attach_id_certificate = ds.attach_id_certificate;
+                    //subdata
+                    this.all_person_absent = response.data.subdata;
+                    this.femal_Booking_bed = response.data.bedfemaldata;
+                    this.mal_Booking_bed = response.data.bedmaldata;
+
+
+                    // setTimeout(() => this.is_working = false, 8000);
+                    setTimeout(() => this.is_working = false, process.env.MIX_SET_TIMEOUT);
+
+                    setTimeout(() => this.loadUnits(), process.env.MIX_SET_TIMEOUT);
+
+                })
+                // Ex.
+                    .catch(
+                        e => console.log(e, this.openAlertUrlErr('danger', 'พบข้อผิดพลาดเนื่องจาก ' + e.response.data.message)),
+                    );
+            },
+            loadPackages() {
+                axios.get('/api/master/packages')
+                    .then(response => {
+                        this.packages = response.data;
+                    })
+                    .catch(err => console.log(err));
+            },
+            loadUnits() {
+
+                axios.get('/api/master/buildings_zone/' + this.zone_id)
+                    .then(response => {
+
+                        this.buildings = response.data;
+                    })
+                    .catch(err => console.log(err));
+            },
+            flatpickrBirthdateClose1(selectedDates, dateStr, fp){
+                fp._input.value=bnl.reFormatDate( fp._input.value)
+                fp.setDate(fp._input.value);
+                this.mal_Booking_bed[fp._input.dataset.indexNumber].birth_date=fp._input.value;
+            },
+            flatpickrBirthdateClose2(selectedDates, dateStr, fp){
+                fp._input.value=bnl.reFormatDate( fp._input.value)
+                fp.setDate(fp._input.value);
+                this.femal_Booking_bed[fp._input.dataset.indexNumber].birth_date=fp._input.value;
+            },
+        },
+        mounted() {
+            this.selDataset(this.$route.params.id);
+            this.loadPackages();
+            this.loadProvinces();
+            // this.loadUnits();
+        },
+        created() {
+        },
+        computed: {
+            configFrombirthdateTimePicker() {
+                return {
+                    // locale: ThaiLocale,
+                    dateFormat: 'd/m/Y',
+                    thaiYear: false,
+                    allowInput: true,
+                    parseDate: function (stringData, format) {
+                        return bnl.strToDate(bnl.reFormatDate(stringData));
+                    },
+                    // altFormat: 'Y-m-d'
+                }
+            },
+            c_building() {
+                return (this.p_building_code == '') ? 'required' : '';
+            },
+            c_floor() {
+                return (this.p_floor == '') ? 'required' : '';
+            },
+            c_room() {
+                return (this.p_room == '') ? 'required' : '';
+            },
+            c_count() {
+                let v_count = (this.p_count == '' || (this.p_count - 0) > (this.max_bed - 0));
+                if (v_count) {
+                    this.p_count = ''
+                }
+                return (this.p_count == '' || (this.p_count - 0) > (this.max_bed - 0)) ? 'required' : '';
+            },
+            vShow() {
+
+                return (this.rest_status_id == '1' ||this.rest_status_id == '2' || this.rest_status_id == null) ? 'true' : '';
+            },
+            link_list() {
+                return "/db/guesnormal/list/" + this.$route.params.id + "/" + this.zone_id;
+            },
+            real_total_person() {
+                return Number(this.total_female) + Number(this.total_male);
+            },
+            validateForm() {
+                let b_reg_status = false;
+                if (this.booking_status_id != '4') {
+                    b_reg_status = true;
+                }
+                return !b_reg_status && !this.errors.any()
+            },
+            // validation_password_rule() {
+            //     return (this.reg_password != '') ? 'required' : '';
+            // },
+            // ampurs(){
+            //     if (this.reg_add_province != '') {
+            //         axios.get('/master/ampur/' + this.reg_add_province)
+            //             .then(response => {
+            //                 console.log("test ampur : "+response.data);
+            //                 // this.reg_add_district = '';
+            //                 return response.data;
+            //             })
+            //             .catch(err => console.log(err));
+            //     }else {
+            //         return [];
+            //     }
+            // }
+
+
+            femal_Booking_beds() {
+
+
+                let pl = this.femal_Booking_bed.length;
+                if (pl == this.total_female) {
+                    return this.femal_Booking_bed;
+                }
+                if (this.total_female > pl) {
+                    //add
+                    let v_total_female = [];
+                    for (let i = 0; i < this.total_female - pl; i++) {
+                        v_total_female[i] = {
+                            'first_name': '',
+                            'last_name': '',
+                            'passport': '',
+                            'birth_date': '',
+                            'gender': 'หญิง',
+                            'bed_code': '',
+                            'birth_location': '',
+                            'sex': '2',
+
+                        };
+                    }
+                    //merge array
+                    this.femal_Booking_bed.push(...v_total_female);
+                }
+
+
+                return this.femal_Booking_bed;
+            },
+            mal_Booking_beds() {
+
+
+                let pl = this.mal_Booking_bed.length;
+                if (pl == this.total_male) {
+                    return this.mal_Booking_bed;
+                }
+                if (this.total_male > pl) {
+                    //add
+                    let v_total_male = [];
+                    for (let i = 0; i < this.total_male - pl; i++) {
+                        v_total_male[i] = {
+                            'first_name': '',
+                            'last_name': '',
+                            'passport': '',
+                            'birth_date': '',
+                            'gender': 'ชาย',
+                            'birth_location': '',
+                            'bed_code': '',
+                            'sex': '1',
+
+                        };
+                    }
+                    //merge array
+                    this.mal_Booking_bed.push(...v_total_male);
+                }
+
+
+                return this.mal_Booking_bed;
+            },
+            validation_male_rule() {
+                var ret = "";
+                for (let i = 0; i < this.mal_Booking_bed.length; i++) {
+                    if (this.mal_Booking_bed[i].first_name == "" ||
+                        this.mal_Booking_bed[i].passport == "" ||
+                        this.mal_Booking_bed[i].birth_date == "" ||
+                        this.mal_Booking_bed[i].birth_location == "" ||
+                        this.mal_Booking_bed[i].bed_code == "") {
+                        ret = "required";
+                        break;
+
+                        // this.mal_Booking_bed[i].last_name == "" ||
+                    }
+
+                }
+                return ret;
+            },
+            validation_female_rule() {
+                var ret = "";
+                for (let i = 0; i < this.femal_Booking_bed.length; i++) {
+                    if (this.femal_Booking_bed[i].first_name == "" ||
+                        this.femal_Booking_bed[i].passport == "" ||
+                        this.femal_Booking_bed[i].birth_date == "" ||
+                        this.femal_Booking_bed[i].birth_location == "" ||
+                        this.femal_Booking_bed[i].bed_code == "") {
+                        ret = "required";
+                        break;
+
+                        // this.femal_Booking_bed[i].last_name == "" ||
+                    }
+
+                }
+                return ret;
+            },
+        },
+        watch: {
+            province: function (val) {
+                this.loadAmpurs(val);
+            },
+            district: function (val) {
+                this.loadTumbons(this.province, val);
+            },
+            subdistrict: function (val) {
+                if (val != null) {
+                    this.zip_code = val.pv_zipcode;
+                }
+            },
+        }
+    }
+
+</script>
+<style lang="scss">
+    .flatpickr-input {
+        width: 100px;
+    }
+    .bedsize {
+        width: 60px;
+    }
+</style>
